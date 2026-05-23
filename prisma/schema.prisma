@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+provider  = "postgresql"
+url       = env("DATABASE_URL")
+directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("pegawai") // super_admin, admin, resepsionis, pegawai, pimpinan
+  phone     String?
+  avatar    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dispositionsFrom Disposition[] @relation("DispositionsFromUser")
+  dispositionsTo   Disposition[] @relation("DispositionsToUser")
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+}
+
+model Department {
+  id          String     @id @default(cuid())
+  name        String
+  code        String     @unique
+  headName    String?
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  employees    Employee[]
+  guests       Guest[]
+  appointments Appointment[]
+}
+
+model Employee {
+  id             String     @id @default(cuid())
+  name           String
+  nip            String?
+  position       String?
+  phone          String?
+  email          String?
+  isActive       Boolean    @default(true)
+  notifyEmail    Boolean    @default(true)
+  notifyWhatsApp Boolean    @default(true)
+  departmentId   String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  department     Department @relation(fields: [departmentId], references: [id])
+  guests         Guest[]
+  appointments   Appointment[]
+}
+
+model Guest {
+  id             String   @id @default(cuid())
+  name           String
+  nik            String?
+  institution    String?
+  address        String?
+  phone          String?
+  email          String?
+  visitPurpose   String
+  departmentId   String?
+  employeeId     String?
+  need           String?
+  photo          String?
+  document       String?
+  signature      String?
+  qrCode         String?
+  status         String   @default("menunggu") // menunggu, check_in, dilayani, selesai, ditolak
+  checkInTime    DateTime?
+  checkOutTime   DateTime?
+  visitDate      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  department     Department? @relation(fields: [departmentId], references: [id])
+  employee       Employee?   @relation(fields: [employeeId], references: [id])
+  dispositions   Disposition[]
+  guestLogs      GuestLog[]
+}
+
+model Disposition {
+  id              String   @id @default(cuid())
+  guestId         String
+  appointmentId   String?
+  fromUserId      String
+  toUserId        String?
+  toDepartmentId  String?
+  status          String   @default("menunggu") // menunggu, diproses, selesai, ditolak
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  guest           Guest       @relation(fields: [guestId], references: [id])
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
+  fromUser        User        @relation("DispositionsFromUser", fields: [fromUserId], references: [id])
+  toUser          User?       @relation("DispositionsToUser", fields: [toUserId], references: [id])
+  followUps       FollowUp[]
+}
+
+model FollowUp {
+  id             String   @id @default(cuid())
+  dispositionId  String
+  description    String
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  disposition    Disposition @relation(fields: [dispositionId], references: [id])
+}
+
+model GuestLog {
+  id        String   @id @default(cuid())
+  guestId   String
+  action    String // check_in, check_out, disposisi, selesai, ditolak
+  notes     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  guest     Guest    @relation(fields: [guestId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info") // info, warning, success, error
+  link      String?  // URL to navigate to when notification is clicked
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Appointment {
+  id              String   @id @default(cuid())
+  visitorName     String
+  visitorNip      String?
+  visitorPosition String?
+  institution     String
+  institutionAddr String?
+  phone           String?
+  email           String?
+  visitPurpose    String
+  visitDate       DateTime
+  visitTime       String?
+  numberOfPeople  Int      @default(1)
+  departmentId    String?
+  employeeId      String?
+  notes           String?
+  document        String?
+  status          String   @default("menunggu") // menunggu, dikonfirmasi, ditolak, selesai, dibatalkan
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  department      Department? @relation(fields: [departmentId], references: [id])
+  employee        Employee?   @relation(fields: [employeeId], references: [id])
+  dispositions    Disposition[]
+}
+
+model BackupRecord {
+  id            String   @id @default(cuid())
+  filename      String
+  fileSize      Int      @default(0)
+  databaseType  String   @default("sqlite")  // sqlite, mysql, postgresql
+  backupType    String   @default("manual")   // manual, auto
+  storageType   String   @default("local")    // local, blob, s3
+  status        String   @default("completed") // completed, failed, uploading
+  blobUrl       String?  // URL for cloud-stored backups
+  notes         String?
+  createdAt     DateTime @default(now())
+}
